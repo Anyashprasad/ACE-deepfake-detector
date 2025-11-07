@@ -1,64 +1,68 @@
-# ace-1-20m-deepfake-detector
-Xception‑based deepfake image detector using transfer learning and mixed precision; best model by validation AUC; test results verified.
+ACE — Adaptive Confidence Engine for Deepfake Detection
+Version: ACE v2.4 (2025 Release)
 
-ACE_1_20M: Xception-based Deepfake Detector
-ACE_1_20M is a binary image classifier that predicts whether a face image is real or fake using an Xception CNN backbone fine‑tuned via transfer learning. It was trained and selected by validation AUC, then verified on a held‑out test split with perfect scores.
+A high-accuracy deepfake detection system trained on 140K real & fake faces and FaceForensics++, featuring adaptive scoring, hybrid pooling, and robust face extraction.
 
-What this is
-Model file: Ace_1_20m.keras (single‑file Keras format).
+✅ Features
 
-Task: Binary classification — real (0) vs fake (1).
+✅ High-accuracy face-based deepfake detection
 
-Backbone: Xception CNN with depthwise‑separable convolutions for efficient, high‑accuracy vision features.
+✅ Works on images and videos
 
-Training approach: Transfer learning from an ImageNet‑pretrained backbone, mixed‑precision training on GPU, early stopping, and best‑checkpoint selection by validation AUC.
+✅ Hybrid pooling for video consistency
 
-Dataset
-Source: FaceForensics++ (FF++) derived image dataset prepared into train/val/test with class subfolders.
+✅ Adaptive threshold shifting
 
-Test split used for final reporting: 1,010 images total (616 fake, 394 real).
+✅ Robust face extraction with fallback
 
-Note: Images are face‑centric frames extracted and organized into “real/” and “fake/” subfolders per split.
+✅ Clean API for inference
 
-Results
-Test accuracy: 100% (all 1,010 images correctly classified at threshold 0.5).
+✅ Dataset Citations
 
-Test ROC AUC: 1.00 (perfect ranking of fakes above reals across thresholds).
+Please cite the datasets used to train ACE:
 
-Confusion matrix (test):
+Comprehensive Deepfake Detection Dataset (2025)
 
-Fake: 616 correct, 0 incorrect.
+Islam, Md Raisul; Rakib, Md. Aminul Islam; Sahin Afridi, Arafat;
+Islam, Mohammad Monirul (2025),
+“Comprehensive Deepfake Detection Dataset: Real and Synthetic Frames from Roop and Akool AI Technologies”,
+Mendeley Data, V1, doi: 10.17632/pdcp9mjy3z.1
 
-Real: 394 correct, 0 incorrect.
+FaceForensics++ (2019)
 
-Intended use
-Educational and research use for deepfake detection on image frames.
+Rössler, A., Cozzolino, D., Verdoliva, L., Riess, C., Thies, J., & Nießner, M.
+FaceForensics++: Learning to Detect Manipulated Facial Images, ICCV 2019.
 
-Not a drop‑in production forensic tool; performance on other datasets or distribution shifts may differ.
+✅ Model Versions
 
-How to load and use
-Requirements: Python 3, TensorFlow/Keras compatible with the .keras format.
+See the full changelog here:
+👉 /docs/ACE_ChangeLog.md
 
-Load the model in Keras and pass preprocessed 299×299 RGB images.
+Major releases:
 
-Preprocessing: Use the official Xception preprocessing and the 299×299 input size to match training.
+ACE v1.0 – Initial system
 
-Example (Python):
+ACE v2.0 – Hybrid video pooling
 
-python
-import tensorflow as tf
-from tensorflow.keras.applications.xception import preprocess_input
-import numpy as np, cv2
+ACE v2.3 – Balanced FF++ + 140K training
 
-model = tf.keras.models.load_model("Ace_1_20m.keras")
+ACE v2.4 – Unified best-performing release
 
-img = cv2.imread("path/to/image.jpg")[:, :, ::-1]          # BGR->RGB
-img = cv2.resize(img, (299, 299)).astype("float32")
-x = preprocess_input(img[None, ...])                        # shape (1,299,299,3)
-p_fake = float(model.predict(x, verbose=0)[0][0])           # probability of fake (1)
-label = "fake" if p_fake >= 0.5 else "real"
-print({"prob_fake": p_fake, "label": label})
-File info
-Filename: Ace_1_20m.keras
+✅ Basic Usage
+Image Inference
+from ace import predict_image
+label, score = predict_image("example.jpg")
 
-Format: Keras single‑file model (architecture, weights, and config bundled).
+Video Inference
+from ace import predict_video
+label, score = predict_video("video.mp4")
+
+✅ Performance
+
+✔ High generalization to unseen deepfake methods
+
+✔ Strong robustness to compression & low-res inputs
+
+✔ Excellent face-detection fallback logic
+
+Full evaluation results available in /results/.
