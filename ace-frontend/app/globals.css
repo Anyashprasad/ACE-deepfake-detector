@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020304;
+  --foreground: #ffffff;
+  --neon-green: #39FF8A;
+  --neon-teal: #00F0FF;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --text-muted: #8892b0;
+}
+
+@theme inline {
+  /* Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-neon-green: var(--neon-green);
+  --color-neon-teal: var(--neon-teal);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  --color-text-muted: var(--text-muted);
+
+  /* Font Families */
+  --font-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Courier New', monospace;
+
+  /* Animations */
+  --animate-fade-in: fadeIn 0.5s ease-out;
+  --animate-slide-up: slideUp 0.5s ease-out;
+  --animate-scale-in: scaleIn 0.3s ease-out;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Glassmorphism utility */
+@keyframes fade-spin {
+  0% {
+    opacity: 0.15;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* Neon glow effect */
+.neon-glow {
+  text-shadow: 0 0 10px var(--neon-green);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

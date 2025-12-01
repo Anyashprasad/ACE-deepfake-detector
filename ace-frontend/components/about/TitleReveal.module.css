@@ -1,0 +1,102 @@
+/* TitleReveal Component Styles */
+
+.container {
+    position: relative;
+    width: 100%;
+    padding: 2rem 0;
+}
+
+.primaryTextWrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+}
+
+.primaryLeft,
+.primaryRight {
+    font-weight: bold;
+    text-align: center;
+    color: #ffffff;
+    line-height: 0.8;
+}
+
+/* Glitch Overlay for dramatic effect */
+.glitchOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background: linear-gradient(45deg,
+            transparent 30%,
+            rgba(57, 255, 138, 0.1) 50%,
+            transparent 70%);
+    animation: scanline 0.15s linear;
+}
+
+@keyframes scanline {
+
+    0%,
+    100% {
+        transform: translateY(-100%);
+    }
+
+    50% {
+        transform: translateY(100%);
+    }
+}
+
+.secondaryText {
+    font-weight: 300;
+    letter-spacing: 0.375rem;
+    color: #ffffff;
+    text-align: center;
+}
+
+/* Responsive font sizes */
+@media (max-width: 768px) {
+
+    .primaryLeft,
+    .primaryRight {
+        font-size: 2.5rem;
+        letter-spacing: -0.25rem;
+    }
+
+    .secondaryText {
+        font-size: 1.5rem;
+        letter-spacing: 0.25rem;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1280px) {
+
+    .primaryLeft,
+    .primaryRight {
+        font-size: 4.5rem;
+        letter-spacing: -0.5rem;
+    }
+
+    .secondaryText {
+        font-size: 2rem;
+        letter-spacing: 0.3rem;
+    }
+}
+
+@media (min-width: 1281px) {
+
+    .primaryLeft,
+    .primaryRight {
+        font-size: 7.5rem;
+        letter-spacing: -0.5rem;
+    }
+
+    .secondaryText {
+        font-size: 2.5rem;
+        letter-spacing: 0.375rem;
+    }
+}

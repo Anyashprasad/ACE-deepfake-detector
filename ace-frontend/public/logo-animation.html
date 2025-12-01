@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ACE 2.4 - Anime Accurate Impact</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@1,900&display=swap');
+
+    :root {
+        /* ACE 2.4 Design System */
+        --bg-color: #0a0a0a;
+        --text-color: #ffffff;
+        --neon-green: #00ff88;
+        --neon-cyan: #00d9ff;
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        
+        --slice-angle: -12deg;
+        --anim-start: 1.0s; /* Global delay to let you get ready */
+    }
+
+    body {
+        background: linear-gradient(135deg, #0a0a0a 0%, #0f1419 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        overflow: hidden;
+        font-family: 'Kanit', sans-serif;
+        position: relative;
+    }
+
+    /* Animated background particles */
+    body::before {
+        content: '';
+        position: absolute;
+        width: 200%;
+        height: 200%;
+        background: 
+            radial-gradient(circle at 20% 50%, rgba(0, 255, 136, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(0, 217, 255, 0.03) 0%, transparent 50%);
+        animation: particleFloat 20s ease-in-out infinite;
+    }
+
+    @keyframes particleFloat {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(-50px, -30px); }
+    }
+
+    /* IMPACT FLASH (Enhanced with neon tint) */
+    .flash-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle, var(--neon-green) 0%, white 50%);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 100;
+        animation: flashBang 0.1s step-end var(--anim-start) forwards;
+    }
+
+    .container {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .bg-kanji {
+        position: absolute;
+        font-size: 25rem;
+        background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        z-index: 0;
+        line-height: 1;
+        white-space: nowrap;
+        user-select: none;
+        transform: rotate(5deg);
+        opacity: 0;
+        filter: blur(2px);
+        animation: appearInstant 0s step-end var(--anim-start) forwards;
+    }
+
+    .logo-wrapper {
+        position: relative;
+        font-size: 15rem;
+        font-style: italic;
+        font-weight: 900;
+        letter-spacing: -10px;
+        z-index: 10;
+        text-transform: uppercase;
+        line-height: 0.8;
+        /* Glassmorphism glow */
+        filter: drop-shadow(0 0 40px rgba(0, 255, 136, 0.3));
+    }
+
+    .logo-base { 
+        opacity: 0; 
+    }
+
+    .logo-layer {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        display: flex; justify-content: center; align-items: center;
+        /* Gradient text effect */
+        background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+    }
+
+    /* Add neon outline */
+    .logo-layer::before {
+        content: 'ACE';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 15rem;
+        font-style: italic;
+        font-weight: 900;
+        letter-spacing: -10px;
+        color: transparent;
+        -webkit-text-stroke: 2px var(--neon-green);
+        opacity: 0.3;
+        z-index: -1;
+    }
+
+    /* --- THE CUT --- */
+    
+    /* TOP HALF */
+    .layer-top {
+        clip-path: polygon(0 0, 100% 0, 100% 45%, 0 58%);
+        animation: impactTop 0.4s cubic-bezier(0.1, 1, 0.1, 1) var(--anim-start) forwards;
+    }
+
+    /* BOTTOM HALF */
+    .layer-bottom {
+        clip-path: polygon(0 58%, 100% 45%, 100% 100%, 0 100%);
+        animation: impactBottom 0.4s cubic-bezier(0.1, 1, 0.1, 1) var(--anim-start) forwards;
+    }
+
+    /* THE SLASH LINE (Neon beam) */
+    .slash {
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 200vw; height: 8px;
+        background: linear-gradient(90deg, 
+            transparent 0%, 
+            var(--neon-cyan) 20%, 
+            var(--neon-green) 50%, 
+            var(--neon-cyan) 80%, 
+            transparent 100%);
+        transform: translate(-50%, -50%) rotate(var(--slice-angle)) scaleX(0);
+        box-shadow: 
+            0 0 20px var(--neon-green),
+            0 0 40px var(--neon-green),
+            0 0 80px rgba(0, 255, 136, 0.5);
+        z-index: 50;
+        animation: slashStrike 0.15s cubic-bezier(0.0, 0.0, 0.2, 1) calc(var(--anim-start) - 0.15s) forwards;
+    }
+
+    /* Energy trails on slash */
+    .slash::before,
+    .slash::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: inherit;
+        opacity: 0.5;
+    }
+
+    .slash::before {
+        transform: translateY(-10px);
+        filter: blur(4px);
+    }
+
+    .slash::after {
+        transform: translateY(10px);
+        filter: blur(4px);
+    }
+
+    /* Speed lines */
+    .speed-lines {
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 100%;
+        height: 2px;
+        opacity: 0;
+        z-index: 49;
+        animation: speedLine 0.2s ease-out calc(var(--anim-start) - 0.15s) forwards;
+    }
+
+    .speed-line {
+        position: absolute;
+        height: 100%;
+        background: var(--neon-cyan);
+        transform-origin: left center;
+        box-shadow: 0 0 10px var(--neon-cyan);
+    }
+
+    .speed-line:nth-child(1) {
+        width: 150px;
+        top: -20px;
+        left: -100px;
+        transform: rotate(-15deg);
+        animation-delay: 0s;
+    }
+
+    .speed-line:nth-child(2) {
+        width: 100px;
+        top: 20px;
+        left: -80px;
+        transform: rotate(-10deg);
+        animation-delay: 0.02s;
+    }
+
+    .speed-line:nth-child(3) {
+        width: 200px;
+        top: -40px;
+        left: -120px;
+        transform: rotate(-18deg);
+        animation-delay: 0.04s;
+    }
+
+    /* --- ANIMATION SEQUENCES --- */
+
+    /* 1. The Slash: Rapid expansion with gradient trail */
+    @keyframes slashStrike {
+        0% { 
+            transform: translate(-50%, -50%) rotate(var(--slice-angle)) scaleX(0); 
+            opacity: 1; 
+        }
+        80% { 
+            transform: translate(-50%, -50%) rotate(var(--slice-angle)) scaleX(1); 
+            opacity: 1; 
+        }
+        100% { 
+            transform: translate(-50%, -50%) rotate(var(--slice-angle)) scaleX(1); 
+            opacity: 0; 
+        }
+    }
+
+    @keyframes speedLine {
+        0% { opacity: 0; transform: translateX(0); }
+        50% { opacity: 1; }
+        100% { opacity: 0; transform: translateX(200px); }
+    }
+
+    /* 2. The Flashbang with color */
+    @keyframes flashBang {
+        0% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+
+    /* 3. Text Impact: Top Layer */
+    @keyframes impactTop {
+        0% { transform: translate(0, 0); }
+        10% { 
+            transform: translate(-25px, -15px); 
+            filter: drop-shadow(0 0 60px var(--neon-green));
+        }
+        50% { 
+            transform: translate(-25px, -15px); 
+            filter: drop-shadow(0 0 60px var(--neon-green));
+        }
+        60% { 
+            transform: translate(0, 0); 
+            filter: drop-shadow(0 0 40px rgba(0, 255, 136, 0.3));
+        }
+        100% { 
+            transform: translate(0, 0); 
+            filter: drop-shadow(0 0 40px rgba(0, 255, 136, 0.3));
+        }
+    }
+
+    /* 4. Text Impact: Bottom Layer */
+    @keyframes impactBottom {
+        0% { transform: translate(0, 0); }
+        10% { 
+            transform: translate(25px, 15px); 
+            filter: drop-shadow(0 0 60px var(--neon-cyan));
+        }
+        50% { 
+            transform: translate(25px, 15px); 
+            filter: drop-shadow(0 0 60px var(--neon-cyan));
+        }
+        60% { 
+            transform: translate(0, 0); 
+            filter: drop-shadow(0 0 40px rgba(0, 255, 136, 0.3));
+        }
+        100% { 
+            transform: translate(0, 0); 
+            filter: drop-shadow(0 0 40px rgba(0, 255, 136, 0.3));
+        }
+    }
+
+    @keyframes appearInstant { 
+        to { opacity: 0.15; } 
+    }
+
+    /* Click to replay hint */
+    .replay-hint {
+        position: fixed;
+        bottom: 30px;
+        font-size: 0.9rem;
+        color: var(--neon-green);
+        opacity: 0;
+        animation: fadeInHint 1s ease-in 2s forwards;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-style: italic;
+    }
+
+    @keyframes fadeInHint {
+        to { opacity: 0.5; }
+    }
+
+</style>
+</head>
+<body>
+
+    <div class="flash-overlay"></div>
+
+    <div class="container">
+        <div class="bg-kanji">エース</div>
+        <div class="slash">
+            <div class="speed-lines">
+                <div class="speed-line"></div>
+                <div class="speed-line"></div>
+                <div class="speed-line"></div>
+            </div>
+        </div>
+        
+        <div class="logo-wrapper">
+            <span class="logo-base">ACE</span>
+            <div class="logo-layer layer-top">ACE</div>
+            <div class="logo-layer layer-bottom">ACE</div>
+        </div>
+    </div>
+
+    <div class="replay-hint">Click to replay</div>
+
+    <script>
+        document.body.addEventListener('click', () => {
+            const container = document.querySelector('.container');
+            const flash = document.querySelector('.flash-overlay');
+            const slash = document.querySelector('.slash');
+            const hint = document.querySelector('.replay-hint');
+            
+            // Reset animations
+            container.style.display = 'none';
+            flash.style.display = 'none';
+            slash.style.display = 'none';
+            hint.style.opacity = '0';
+            
+            setTimeout(() => {
+                container.style.display = 'flex';
+                flash.style.display = 'block';
+                slash.style.display = 'block';
+                setTimeout(() => { hint.style.opacity = '0.5'; }, 2000);
+            }, 10);
+        });
+
+        // Auto-hide hint on first click
+        let firstClick = true;
+        document.body.addEventListener('click', () => {
+            if (firstClick) {
+                document.querySelector('.replay-hint').style.transition = 'opacity 0.3s';
+                firstClick = false;
+            }
+        });
+    </script>
+</body>
+</html>
