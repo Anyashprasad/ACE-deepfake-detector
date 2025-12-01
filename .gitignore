@@ -1,0 +1,9 @@
+.idea/
+.venv/
+ace-frontend-backup/
+backup_ace_backend/
+*.whl
+__pycache__/
+node_modules/
+.env
+.DS_Store
