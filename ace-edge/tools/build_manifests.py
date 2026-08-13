@@ -2,6 +2,9 @@
 
 from pathlib import Path
 import csv, hashlib, json, re
+from collections import Counter
+import numpy as np
+from scipy.fft import dctn
 from PIL import Image
 
 ROOT = Path("/kaggle/input")
@@ -18,27 +21,33 @@ def sha(path):
     return digest.hexdigest()
 
 
-def ahash(path):
+def phash(path):
     with Image.open(path) as image:
-        pixels = list(image.convert("L").resize((8, 8), Image.Resampling.LANCZOS).getdata())
-    mean = sum(pixels) / 64
-    return f"{sum((value >= mean) << (63 - index) for index, value in enumerate(pixels)):016x}"
+        pixels = np.asarray(image.convert("L").resize((32, 32), Image.Resampling.LANCZOS), dtype=np.float32)
+    low = dctn(pixels, norm="ortho")[:8, :8].reshape(-1)
+    median = np.median(low[1:])
+    return f"{sum((value >= median) << (63 - index) for index, value in enumerate(low)):016x}"
 
 
 def canon(value):
     compact = re.sub(r"[^a-z0-9]", "", value.lower())
-    return {"sd15": "sd_1_5", "stablediffusion15": "sd_1_5"}.get(compact, compact)
+    return {
+        "sd15": "sd_1_5", "stablediffusion15": "sd_1_5", "0424sdv5": "sd_1_5",
+        "imagenetmidjourney": "midjourney", "imagenetglide": "glide",
+        "0419biggan": "biggan", "0424wukong": "wukong", "0508adm": "adm",
+        "0419vqdm": "vqdm",
+    }.get(compact, compact)
 
 
 def row(path, class_name, source, split, family, generator):
     content_sha = sha(path)
-    perceptual_hash = ahash(path)
+    perceptual_hash = phash(path)
     return {
         "sample_id": hashlib.sha256(str(path).encode()).hexdigest()[:24],
         "path": str(path), "local_path": str(path), "local_valid": 0,
-        "sha256": content_sha, "phash": perceptual_hash, "phash_version": "ahash64-v1",
+        "sha256": content_sha, "phash": perceptual_hash, "phash_version": "phash64-v1",
         "local_sha256": content_sha, "local_phash": perceptual_hash,
-        "local_phash_version": "ahash64-v1", "class_name": class_name,
+        "local_phash_version": "phash64-v1", "class_name": class_name,
         "source_dataset": source, "split": split, "family_id": family,
         "generator_or_method": generator, "locality_target": 0,
         "reliability_target": 0, "reliability_basis": "disabled_baseline",
@@ -97,6 +106,10 @@ def main():
         rows.append(row(image, class_name, "140k_faces", "train", "",
                         "stylegan" if class_name == "ai_generated" else "real"))
 
+    hash_counts = Counter(item["sha256"] for item in rows)
+    duplicate_hashes = {digest for digest, count in hash_counts.items() if count > 1}
+    removed_duplicate_rows = sum(hash_counts[digest] for digest in duplicate_hashes)
+    rows = [item for item in rows if item["sha256"] not in duplicate_hashes]
     fields = list(rows[0])
     counts = {}
     for split in ("train", "validation", "internal_test", "unseen_generator_test"):
@@ -105,7 +118,7 @@ def main():
         with (OUT / f"{split}.csv").open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=fields)
             writer.writeheader(); writer.writerows(subset)
-    report = {"counts": counts, "total": len(rows)}
+    report = {"counts": counts, "total": len(rows), "removed_exact_duplicate_rows": removed_duplicate_rows}
     (OUT / "build_report.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report))
 

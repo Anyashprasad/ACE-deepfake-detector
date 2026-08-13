@@ -4,7 +4,9 @@ import hashlib
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 from PIL import Image
+from scipy.fft import dctn
 
 from .contracts import CLASS_TO_ID, FORBIDDEN_DEVELOPMENT_SOURCES, ensure_under_directory
 
@@ -14,7 +16,7 @@ REQUIRED_COLUMNS = {
     "family_id", "generator_or_method", "locality_target", "reliability_target", "reliability_basis",
 }
 HELDOUT_GENERATORS = {"sd_1_5", "midjourney", "vqdm"}
-PHASH_VERSION = "ahash64-v1"
+PHASH_VERSION = "phash64-v1"
 
 
 def canonical_generator(value: str) -> str:
@@ -28,6 +30,41 @@ def phash_distance(left: str, right: str) -> int:
     return (int(left, 16) ^ int(right, 16)).bit_count()
 
 
+class _HammingBKTree:
+    """Metric index for exact radius searches over 64-bit perceptual hashes."""
+
+    def __init__(self, values):
+        self.root = None
+        for value in dict.fromkeys(values):
+            self.add(value)
+
+    def add(self, value):
+        if self.root is None:
+            self.root = [value, {}]
+            return
+        node = self.root
+        while True:
+            distance = phash_distance(value, node[0])
+            child = node[1].get(distance)
+            if child is None:
+                node[1][distance] = [value, {}]
+                return
+            node = child
+
+    def has_within(self, value, radius):
+        if self.root is None:
+            return False
+        pending = [self.root]
+        while pending:
+            node = pending.pop()
+            distance = phash_distance(value, node[0])
+            if distance <= radius:
+                return True
+            low, high = distance - radius, distance + radius
+            pending.extend(child for edge, child in node[1].items() if low <= edge <= high)
+        return False
+
+
 def file_sha256(path: str) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as stream:
@@ -38,9 +75,10 @@ def file_sha256(path: str) -> str:
 
 def perceptual_hash(path: str) -> str:
     with Image.open(path) as image:
-        pixels = list(image.convert("L").resize((8, 8), Image.Resampling.LANCZOS).getdata())
-    mean = sum(pixels) / len(pixels)
-    value = sum((pixel >= mean) << (63 - index) for index, pixel in enumerate(pixels))
+        pixels = np.asarray(image.convert("L").resize((32, 32), Image.Resampling.LANCZOS), dtype=np.float32)
+    low = dctn(pixels, norm="ortho")[:8, :8].reshape(-1)
+    median = np.median(low[1:])
+    value = sum((coefficient >= median) << (63 - index) for index, coefficient in enumerate(low))
     return f"{value:016x}"
 
 
@@ -116,9 +154,16 @@ def assert_independent(train: pd.DataFrame, validation: pd.DataFrame) -> None:
     overlap = left_exact & right_exact - {""}
     if overlap:
         raise ValueError(f"Exact content leakage: {len(overlap)} hashes")
+    versions = set(train["phash_version"]) | set(validation["phash_version"])
+    if versions != {"phash64-v1"}:
+        raise ValueError(
+            "Production perceptual-leakage gating requires phash64-v1; "
+            f"found {sorted(versions)}. ahash64-v1 is diagnostic-only."
+        )
     right_hashes = list(validation["phash"]) + list(validation["local_phash"])
-    for left_hash in list(train["phash"]) + list(train["local_phash"]):
-        if any(phash_distance(left_hash, right_hash) <= 4 for right_hash in right_hashes):
+    right_tree = _HammingBKTree(right_hashes)
+    for left_hash in dict.fromkeys(list(train["phash"]) + list(train["local_phash"])):
+        if right_tree.has_within(left_hash, 4):
             raise ValueError("Perceptual content leakage within Hamming distance <=4")
 
 

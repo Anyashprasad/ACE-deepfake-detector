@@ -9,6 +9,20 @@ from ace_edge.metrics import dangerous_false_real_rate, multiclass_brier, unseen
 from ace_edge.train import decode_sample_ids
 
 class TestContracts(unittest.TestCase):
+    def test_bk_tree_finds_only_radius_matches(self):
+        from ace_edge.data import _HammingBKTree
+        tree = _HammingBKTree(["0000000000000000", "ffffffffffffffff"])
+        self.assertTrue(tree.has_within("000000000000000f", 4))
+        self.assertFalse(tree.has_within("000000000000001f", 4))
+
+    def test_ahash_cannot_satisfy_production_leakage_gate(self):
+        left = pd.DataFrame({"sample_id":["a"],"family_id":["fam-a"],"sha256":["a"],"local_sha256":["la"],
+                             "phash":["0"*16],"local_phash":["0"*16],"phash_version":["ahash64-v1"]})
+        right = pd.DataFrame({"sample_id":["b"],"family_id":["fam-b"],"sha256":["b"],"local_sha256":["lb"],
+                              "phash":["f"*16],"local_phash":["f"*16],"phash_version":["ahash64-v1"]})
+        with self.assertRaisesRegex(ValueError, "diagnostic-only"):
+            assert_independent(left, right)
+
     def test_canonical_class_order(self):
         self.assertEqual(CLASS_TO_ID, {"likely_real":0,"ai_generated":1,"face_manipulated":2})
     def test_heldout_aliases(self):
@@ -26,9 +40,9 @@ class TestContracts(unittest.TestCase):
         x=pd.DataFrame({"b":[2],"a":[1]}); self.assertEqual(manifest_digest(x),manifest_digest(x[["a","b"]]))
     def test_all_split_leakage(self):
         a=pd.DataFrame({"sample_id":["a"],"family_id":["fa"],"sha256":["h"],"local_sha256":["hl"],
-                        "phash":["0000000000000000"],"local_phash":["ffffffffffffffff"]})
+                        "phash":["0000000000000000"],"local_phash":["ffffffffffffffff"],"phash_version":["phash64-v1"]})
         b=pd.DataFrame({"sample_id":["b"],"family_id":["fb"],"sha256":["x"],"local_sha256":["xl"],
-                        "phash":["0000000000000001"],"local_phash":["aaaaaaaaaaaaaaaa"]})
+                        "phash":["0000000000000001"],"local_phash":["aaaaaaaaaaaaaaaa"],"phash_version":["phash64-v1"]})
         with self.assertRaisesRegex(ValueError,"Perceptual"):
             assert_all_splits_independent({"train":a,"external":b})
     def test_raw_manifest_hash_binds_bytes(self):
