@@ -1,0 +1,15 @@
+{
+  "id": "anyashprasad/ace-edge-manifest-builder",
+  "title": "ACE Edge Manifest Builder",
+  "code_file": "build_manifests.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "anyashprasad/ace-edge-ffpp-compact",
+    "yangsangtai/tiny-genimage",
+    "xhlulu/140k-real-and-fake-faces"
+  ]
+}
