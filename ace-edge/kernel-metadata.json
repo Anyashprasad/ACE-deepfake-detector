@@ -1,0 +1,11 @@
+{
+  "id": "anyashprasad/ace-edge-dual-t4",
+  "title": "ACE Edge Dual T4",
+  "code_file": "kaggle_entry.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": false,
+  "dataset_sources": ["anyashprasad/ace-edge-training-source", "anyashprasad/ace-edge-ffpp-compact", "yangsangtai/tiny-genimage", "cartografia/unbiased-tiny-genimage", "xhlulu/140k-real-and-fake-faces"]
+}

@@ -1,5 +1,5 @@
 // API client for FastAPI backend
-const API_BASE = 'http://localhost:8000';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 export interface PredictionResult {
     prediction: string;
@@ -8,52 +8,43 @@ export interface PredictionResult {
     model_version?: string;
 }
 
-export async function predictImage(file: File): Promise<PredictionResult> {
+async function requestPrediction(path: string, file: File): Promise<PredictionResult> {
     const formData = new FormData();
     formData.append('file', file);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 120_000);
+    const startTime = performance.now();
 
-    const startTime = Date.now();
-    const response = await fetch(`${API_BASE}/predict/image`, {
-        method: 'POST',
-        body: formData,
-    });
-
-    if (!response.ok) {
-        throw new Error(`Prediction failed: ${response.statusText}`);
+    try {
+        const response = await fetch(`${API_BASE}${path}`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.detail || `Analysis failed (${response.status})`);
+        }
+        return {
+            prediction: payload.label,
+            confidence: payload.confidence,
+            inference_time: (performance.now() - startTime) / 1000,
+            model_version: payload.model_version ?? 'ACE 2.4',
+        };
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw new Error('The model took too long to respond. Please try a smaller file.');
+        }
+        throw error;
+    } finally {
+        window.clearTimeout(timeout);
     }
+}
 
-    const data = await response.json();
-    const inference_time = (Date.now() - startTime) / 1000;
-
-    return {
-        prediction: data.label,
-        confidence: data.confidence,
-        inference_time,
-        model_version: 'ACE 2.4'
-    };
+export async function predictImage(file: File): Promise<PredictionResult> {
+    return requestPrediction('/predict/image', file);
 }
 
 export async function predictVideo(file: File): Promise<PredictionResult> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const startTime = Date.now();
-    const response = await fetch(`${API_BASE}/predict/video`, {
-        method: 'POST',
-        body: formData,
-    });
-
-    if (!response.ok) {
-        throw new Error(`Prediction failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const inference_time = (Date.now() - startTime) / 1000;
-
-    return {
-        prediction: data.label,
-        confidence: data.confidence,
-        inference_time,
-        model_version: 'ACE 2.4'
-    };
+    return requestPrediction('/predict/video', file);
 }

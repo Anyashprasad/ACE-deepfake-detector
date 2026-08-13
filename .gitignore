@@ -7,3 +7,11 @@ __pycache__/
 node_modules/
 .env
 .DS_Store
+.next/
+ace-edge/outputs/
+ace-edge/data/
+ace-edge/**/*.keras
+ace-edge/**/*.h5
+ace-edge/**/*.tflite
+ace-edge/**/*predictions*.csv
+ace-edge/**/*integrity*.json

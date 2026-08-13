@@ -1,0 +1,14 @@
+{
+  "schema_version": "ace-edge-release-gates-v1",
+  "frozen_before_external_evaluation": true,
+  "heldout_ai_auc_min": 0.70,
+  "heldout_face_auc_min": 0.70,
+  "ai_recall_min": 0.50,
+  "face_recall_min": 0.50,
+  "dangerous_false_real_max": 0.20,
+  "selective_coverage_min": 0.70,
+  "abstention_false_real_reduction_min": 0.10,
+  "int8_balanced_accuracy_drop_max": 0.03,
+  "sdfvd_balanced_accuracy_gain_min": 0.10,
+  "sdfvd_fake_recall_gain_min": 0.30
+}

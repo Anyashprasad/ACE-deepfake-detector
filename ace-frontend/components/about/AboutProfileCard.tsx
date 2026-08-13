@@ -90,7 +90,7 @@ export function AboutProfileCard() {
                     className="md:mt-48 mt-16"
                 >
                     <p className="mx-auto max-w-2xl font-mono text-center text-sm font-medium tracking-wide md:text-base text-text-muted">
-                        I'M AN EXPERIENCED CYBERSECURITY RESEARCHER & FULL STACK DEVELOPER,
+                        I&apos;M A CYBERSECURITY STUDENT & SOFTWARE DEVELOPER,
                         <br />
                         WHO BUILDS SECURE AND INTELLIGENT WEB EXPERIENCES FOR
                         <br />

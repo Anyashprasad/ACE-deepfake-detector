@@ -27,6 +27,7 @@ interface FileWithPreview {
         confidence: number;
         inference_time: number;
     };
+    error?: string;
 }
 
 export default function EnhancedFileUpload({ onResultsUpdate }: { onResultsUpdate?: (files: FileWithPreview[]) => void }) {
@@ -43,7 +44,7 @@ export default function EnhancedFileUpload({ onResultsUpdate }: { onResultsUpdat
         const newFilesArray = Array.from(fileList).slice(0, MAX_FILES - currentCount);
 
         const newFiles = newFilesArray.map((file) => ({
-            id: `${URL.createObjectURL(file)}-${Date.now()}`,
+            id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
             preview: URL.createObjectURL(file),
             progress: 0,
             name: file.name,
@@ -58,75 +59,32 @@ export default function EnhancedFileUpload({ onResultsUpdate }: { onResultsUpdat
     };
 
     // Analyze all uploaded files
-    const handleAnalyze = () => {
+    const handleAnalyze = async () => {
         setIsAnalyzing(true);
         const unanalyzedFiles = files.filter(f => f.progress === 0 && !f.result);
+        const outcomes = await Promise.all(unanalyzedFiles.map(async (item) => {
+            try {
+                const result = item.file.type.startsWith("image/")
+                    ? await predictImage(item.file)
+                    : await predictVideo(item.file);
+                return { id: item.id, result };
+            } catch (error) {
+                return { id: item.id, error: error instanceof Error ? error.message : "Analysis failed" };
+            }
+        }));
 
-        unanalyzedFiles.forEach((f) => {
-            uploadFile(f.id, f.file);
+        setFiles(prev => {
+            const updated = prev.map(file => {
+                const outcome = outcomes.find(item => item.id === file.id);
+                if (!outcome) return file;
+                return outcome.result
+                    ? { ...file, progress: 100, result: outcome.result }
+                    : { ...file, progress: -1, error: outcome.error };
+            });
+            onResultsUpdate?.(updated);
+            return updated;
         });
-    };
-
-    // Real upload to backend
-    const uploadFile = async (id: string, file: File) => {
-        try {
-            const isImage = file.type.startsWith("image/");
-            const isVideo = file.type.startsWith("video/");
-
-            // Simulate progress
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += Math.random() * 20;
-                setFiles((prev) =>
-                    prev.map((f) =>
-                        f.id === id ? { ...f, progress: Math.min(progress, 90) } : f
-                    )
-                );
-                if (progress >= 90) clearInterval(progressInterval);
-            }, 200);
-
-            let result;
-            if (isImage) {
-                result = await predictImage(file);
-            } else if (isVideo) {
-                result = await predictVideo(file);
-            } else {
-                throw new Error("Unsupported file type");
-            }
-
-            clearInterval(progressInterval);
-
-            const updatedFiles = files.map((f) =>
-                f.id === id ? { ...f, progress: 100, result } : f
-            );
-            setFiles(updatedFiles);
-
-            // Check if all files are done analyzing
-            const allDone = updatedFiles.every(f => f.progress === 100 || f.result);
-            if (allDone) {
-                setIsAnalyzing(false);
-            }
-
-            // Notify parent with updated files
-            onResultsUpdate?.(updatedFiles);
-
-        } catch (error) {
-            console.error("Upload error:", error);
-            const errorMessage = error instanceof Error ? error.message : "Analysis failed";
-            const updatedFiles = files.map((f) =>
-                f.id === id ? {
-                    ...f,
-                    progress: -1, // Use -1 to indicate error state
-                    result: {
-                        prediction: "ERROR",
-                        confidence: 0,
-                        inference_time: 0
-                    }
-                } : f
-            );
-            setFiles(updatedFiles);
-            setIsAnalyzing(false);
-        }
+        setIsAnalyzing(false);
     };
 
     const onDrop = (e: DragEvent) => {
@@ -380,6 +338,12 @@ export default function EnhancedFileUpload({ onResultsUpdate }: { onResultsUpdat
                                                     )}
                                                 />
                                             </div>
+
+                                            {file.error && (
+                                                <p className="mt-2 text-xs leading-relaxed text-red-400" role="alert">
+                                                    {file.error}
+                                                </p>
+                                            )}
 
                                             {/* Show result if available */}
                                             {file.result && file.result.prediction !== "ERROR" && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { PredictionResult } from "@/lib/api";
 import EnhancedFileUpload from "@/components/upload/FileUpload";
 import { EnhancedResultCard } from "@/components/results/EnhancedResultCard";
 import { AboutProfileCard } from "@/components/about/AboutProfileCard";
@@ -17,11 +18,12 @@ import { LogoAnimation } from "@/components/logo/LogoAnimation";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
-  const [results, setResults] = useState<any[]>([]);
+  type DisplayResult = PredictionResult & { filename: string };
+  const [results, setResults] = useState<DisplayResult[]>([]);
 
-  const handleResultsUpdate = (files: any[]) => {
+  const handleResultsUpdate = (files: Array<{ name: string; result?: PredictionResult }>) => {
     const processedResults = files
-      .filter(f => f.result)
+      .filter((f): f is { name: string; result: PredictionResult } => Boolean(f.result))
       .map(f => ({
         prediction: f.result.prediction,
         confidence: f.result.confidence,
@@ -73,7 +75,7 @@ export default function Home() {
               transition={{ duration: 0.8, delay: 1.6 }}
               className="text-xl md:text-2xl text-text-muted max-w-2xl mx-auto mt-6"
             >
-              Deepfake detection using Xception CNN trained on 140K images. Upload images or videos for analysis.
+              An experimental deepfake-screening tool powered by ACE 2.4. Upload an image or video to inspect the model&apos;s signal.
             </motion.p>
           </motion.div>
 
@@ -113,12 +115,12 @@ export default function Home() {
               imageUrl="https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=800&q=80"
               title="ACE 2.4"
               subtitle="Deepfake Detector"
-              description="Fine-tuned Xception CNN on FaceForensics++ and 140K real/fake face dataset. Achieves 95.7% test accuracy on the validation set."
-              highlights={["Xception CNN", "140K+ dataset", "12 epochs", "AdamW optimizer"]}
-              accuracy={0.957}
-              precision={0.945}
-              recall={0.952}
-              f1Score={0.948}
+              description="ACE 2.4 is the selected production checkpoint. Earlier in-domain results are under audit for frame-level leakage and do not establish real-world accuracy."
+              highlights={["Xception backbone", "299 × 299 input", "Image + video", "Evaluation in progress"]}
+              accuracy={0}
+              precision={0}
+              recall={0}
+              f1Score={0}
             />
 
             {/* Custom Metrics Visualizations */}
@@ -149,7 +151,7 @@ export default function Home() {
               transition={{ delay: 0.2 }}
               className="text-text-muted max-w-2xl mx-auto"
             >
-              Combining convolutional networks with face detection for deepfake analysis
+              A convolutional image classifier with centre-crop preprocessing and frame sampling for video analysis
             </motion.p>
           </div>
           <ZoomParallax images={parallaxImages} />

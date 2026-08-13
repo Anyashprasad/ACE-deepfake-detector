@@ -1,0 +1,7 @@
+{
+  "title": "ACE Edge Training Source",
+  "id": "anyashprasad/ace-edge-training-source",
+  "licenses": [{"name": "other"}],
+  "isPrivate": true,
+  "description": "Private reviewed ACE Edge dual-T4 training source. No model weights or raw media."
+}

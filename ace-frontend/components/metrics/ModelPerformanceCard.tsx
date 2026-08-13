@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { motion } from "framer-motion";
+import { motion, type HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface PerformanceGraphProps {
@@ -44,7 +44,7 @@ function PerformanceGraph({ accuracy, precision, recall, f1Score }: PerformanceG
     );
 }
 
-interface ModelPerformanceCardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface ModelPerformanceCardProps extends HTMLMotionProps<"div"> {
     imageUrl: string;
     title: string;
     subtitle: string;

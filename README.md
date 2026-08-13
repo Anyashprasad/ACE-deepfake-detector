@@ -1,68 +1,29 @@
-ACE — Adaptive Confidence Engine for Deepfake Detection
-Version: ACE v2.4 (2025 Release)
+# ACE Edge — Adaptive Compact Evidence Engine
 
-A high-accuracy deepfake detection system trained on 140K real & fake faces and FaceForensics++, featuring adaptive scoring, hybrid pooling, and robust face extraction.
+ACE Edge is a research reboot of the original ACE deepfake-detector prototype. It is designed to distinguish **likely real**, **AI-generated**, and **face-manipulated** media with a compact shared model. `inconclusive` is a selective decision, not a fourth learned class.
 
-✅ Features
+## Why the reboot exists
 
-✅ High-accuracy face-based deepfake detection
+ACE 2.4 is preserved as a historical baseline, not a production authenticity oracle. A clean external evaluation on SDFVD exposed a serious generalization failure: 50% balanced accuracy and 0% fake recall (all 53 manipulated videos were classified as real). The earlier near-99% results were not reliable evidence of external generalization because the development pipeline used frame-level splitting, inconsistent label polarity, and post-hoc test adaptation.
 
-✅ Works on images and videos
+ACE Edge starts again with grouped source-family splits, held-out generator families, content-hash leakage checks, fixed pre-registered release gates, and per-sample evaluation evidence.
 
-✅ Hybrid pooling for video consistency
+## Current status
 
-✅ Adaptive threshold shifting
+- Dual-T4 baseline training code is statically approved after independent review.
+- Production execution must begin with a short one-versus-two-T4 smoke/throughput gate.
+- The complete learned inference stack is capped at 50 MiB FP32; INT8 target is 15 MiB.
+- Reliability/abstention training is currently disabled. No public deployment or `inconclusive` safety claim is approved yet.
+- No new ACE Edge performance claim will be published until held-out and SDFVD gates pass.
 
-✅ Robust face extraction with fallback
+See [`ace-edge/README.md`](ace-edge/README.md) for the training entrypoint and [`ace-edge/review/REVIEW_CHECKLIST.md`](ace-edge/review/REVIEW_CHECKLIST.md) for the frozen evaluation contract.
 
-✅ Clean API for inference
+## Historical artifacts
 
-✅ Dataset Citations
+The ACE 2.4 weights remain in the repository solely for reproducibility and comparison. They must not be described as generally robust or used as proof that media is authentic.
 
-Please cite the datasets used to train ACE:
+## Data and licensing
 
-Comprehensive Deepfake Detection Dataset (2025)
+ACE Edge training uses research datasets under their respective terms, including FaceForensics++, Tiny GenImage/GenImage derivatives, Unbiased Tiny GenImage, and 140K Real and Fake Faces. SDFVD is reserved for final external evaluation. Raw datasets and private FF++ derivatives are not redistributed in this repository.
 
-Islam, Md Raisul; Rakib, Md. Aminul Islam; Sahin Afridi, Arafat;
-Islam, Mohammad Monirul (2025),
-“Comprehensive Deepfake Detection Dataset: Real and Synthetic Frames from Roop and Akool AI Technologies”,
-Mendeley Data, V1, doi: 10.17632/pdcp9mjy3z.1
-
-FaceForensics++ (2019)
-
-Rössler, A., Cozzolino, D., Verdoliva, L., Riess, C., Thies, J., & Nießner, M.
-FaceForensics++: Learning to Detect Manipulated Facial Images, ICCV 2019.
-
-✅ Model Versions
-
-See the full changelog here:
-👉 /docs/ACE_ChangeLog.md
-
-Major releases:
-
-ACE v1.0 – Initial system
-
-ACE v2.0 – Hybrid video pooling
-
-ACE v2.3 – Balanced FF++ + 140K training
-
-ACE v2.4 – Unified best-performing release
-
-✅ Basic Usage
-Image Inference
-from ace import predict_image
-label, score = predict_image("example.jpg")
-
-Video Inference
-from ace import predict_video
-label, score = predict_video("video.mp4")
-
-✅ Performance
-
-✔ High generalization to unseen deepfake methods
-
-✔ Strong robustness to compression & low-res inputs
-
-✔ Excellent face-detection fallback logic
-
-Full evaluation results available in /results/.
+This project is research-only. A detector score is evidence for analysis, not proof of authenticity.

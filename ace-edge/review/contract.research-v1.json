@@ -1,0 +1,11 @@
+{
+  "schema_version": "ace-edge-inference-contract-v1",
+  "class_order": [
+    "likely_real",
+    "ai_generated",
+    "face_manipulated"
+  ],
+  "probability_semantics": "softmax_p_class",
+  "inconclusive_semantics": "abstention",
+  "note": "Inconclusive is derived from frozen reliability and disagreement rules; it is never a fourth softmax class."
+}

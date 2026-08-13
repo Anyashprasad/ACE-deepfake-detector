@@ -1,0 +1,25 @@
+{
+  "seed": 2401,
+  "image_size": 224,
+  "global_batch_size": 128,
+  "epochs": 20,
+  "learning_rate": 0.001,
+  "reference_batch_size": 256,
+  "weight_decay": 0.0001,
+  "dropout": 0.2,
+  "backbone_weights": "imagenet",
+  "train_manifest": "/kaggle/input/ace-edge-manifests/train.csv",
+  "validation_manifest": "/kaggle/input/ace-edge-manifests/validation.csv",
+  "unseen_generator_manifest": "/kaggle/input/ace-edge-manifests/unseen_generator_test.csv",
+  "output_dir": "/kaggle/working/ace-edge",
+  "max_fp32_mib": 50.0,
+  "locality_loss_weight": 0.25,
+  "reliability_loss_weight": 0.0,
+  "label_smoothing": 0.05,
+  "cache_dataset": false,
+  "num_parallel_calls": -1
+  ,"steps_per_epoch": 500
+  ,"benchmark_steps": 30
+  ,"minimum_dual_gpu_speedup": 1.35
+  ,"max_output_gib": 2.0
+}

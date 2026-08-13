@@ -94,7 +94,7 @@ export function EnhancedResultCard({
                         <span className="text-3xl font-bold font-mono text-foreground">
                             {(confidence * 100).toFixed(1)}
                         </span>
-                        <span className="text-xs text-text-muted">% confidence</span>
+                        <span className="text-xs text-text-muted">% model score</span>
                     </div>
                 </div>
             </div>
@@ -111,6 +111,10 @@ export function EnhancedResultCard({
                     </p>
                 </div>
             </div>
+
+            <p className="mt-4 text-xs leading-relaxed text-text-muted">
+                Experimental signal only. This is not proof that the media is authentic or manipulated.
+            </p>
 
             {/* Hover arrow */}
             <motion.div
