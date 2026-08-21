@@ -35,9 +35,16 @@ def average_precision(y_true, scores):
     return float((precision*y).sum()/y.sum())
 
 
-def unseen_generator_metrics(y_true, probabilities, generators):
+def unseen_generator_metrics(y_true, probabilities, generators, ai_threshold=.5):
     y_true=np.asarray(y_true); probabilities=np.asarray(probabilities); binary=(y_true==1).astype(int)
-    score=probabilities[:,1]; predicted=(score>=.5).astype(int)
+    score=probabilities[:,1]; predicted=(score>=ai_threshold).astype(int)
+    true_positive=int(((predicted==1)&(binary==1)).sum())
+    false_positive=int(((predicted==1)&(binary==0)).sum())
+    false_negative=int(((predicted==0)&(binary==1)).sum())
+    precision=(true_positive/(true_positive+false_positive)
+               if true_positive+false_positive else 0.0)
+    f1=(2*true_positive/(2*true_positive+false_positive+false_negative)
+        if 2*true_positive+false_positive+false_negative else 0.0)
     recalls={}
     for generator in sorted(set(generators)):
         mask=(np.asarray(generators)==generator)&(binary==1)
@@ -45,5 +52,7 @@ def unseen_generator_metrics(y_true, probabilities, generators):
     real_recall=float((predicted[binary==0]==0).mean()) if (binary==0).any() else float("nan")
     ai_recall=float(predicted[binary==1].mean()) if binary.any() else float("nan")
     return {"roc_auc":binary_auc(binary,score),"pr_auc":average_precision(binary,score),
+            "precision":float(precision),"f1":float(f1),
             "balanced_accuracy":(real_recall+ai_recall)/2,"real_recall":real_recall,
-            "ai_generated_recall":ai_recall,"per_generator_recall":recalls}
+            "ai_generated_recall":ai_recall,"per_generator_recall":recalls,
+            "ai_threshold":float(ai_threshold)}

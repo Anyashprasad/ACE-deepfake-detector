@@ -1,17 +1,71 @@
 import unittest
 import numpy as np
 import pandas as pd
-from ace_edge.contracts import CLASS_TO_ID
+from ace_edge.contracts import CLASS_TO_ID, ensure_under_directory
 from ace_edge.data import (assert_independent, assert_all_splits_independent,
                            canonical_generator, file_sha256, manifest_digest, perceptual_hash,
                            phash_distance, raw_manifest_digest, verify_manifest_content, PHASH_VERSION)
 from ace_edge.metrics import dangerous_false_real_rate, multiclass_brier, unseen_generator_metrics
-from ace_edge.train import decode_sample_ids
+from ace_edge.train import decode_sample_ids, validation_ai_threshold
+from ace_edge.train import bootstrap_speedup_interval
 
 class TestContracts(unittest.TestCase):
+    def test_validation_threshold_rejects_non_finite_probabilities(self):
+        truth = np.array([0, 0, 1])
+        probabilities = np.array([
+            [.9, .1, 0.],
+            [np.nan, np.nan, np.nan],
+            [.1, .9, 0.],
+        ])
+        with self.assertRaisesRegex(RuntimeError, "non-finite"):
+            validation_ai_threshold(truth, probabilities, .95)
+
+    def test_validation_threshold_preserves_target_recall_with_ties(self):
+        truth = np.array([0, 0, 0, 0, 1])
+        probabilities = np.array([
+            [.8, .2, 0.],
+            [.8, .2, 0.],
+            [.8, .2, 0.],
+            [.4, .6, 0.],
+            [.1, .9, 0.],
+        ])
+        threshold = validation_ai_threshold(truth, probabilities, .75)
+        real_recall = np.mean(probabilities[truth == 0, 1] < threshold)
+        self.assertGreaterEqual(real_recall, .75)
+
+    def test_unseen_metrics_report_precision_and_f1(self):
+        truth = np.array([0, 0, 1, 1])
+        probabilities = np.array([
+            [.9, .1, 0.],
+            [.3, .7, 0.],
+            [.2, .8, 0.],
+            [.6, .4, 0.],
+        ])
+        metrics = unseen_generator_metrics(
+            truth, probabilities, np.array(["real", "real", "sd_1_5", "midjourney"]), .5
+        )
+        self.assertAlmostEqual(metrics["precision"], .5)
+        self.assertAlmostEqual(metrics["f1"], .5)
+
+    def test_bootstrap_speedup_interval_is_deterministic(self):
+        one = [100.0, 101.0, 99.0, 100.5] * 30
+        dual = [150.0, 151.0, 149.0, 150.5] * 30
+        first = bootstrap_speedup_interval(one, dual, seed=2401, draws=500)
+        second = bootstrap_speedup_interval(one, dual, seed=2401, draws=500)
+        self.assertEqual(first, second)
+        self.assertGreater(first["ci95_low"], 1.35)
+        self.assertLessEqual(first["ci95_low"], first["median"])
+        self.assertLessEqual(first["median"], first["ci95_high"])
+
+    def test_only_approved_kaggle_manifest_roots(self):
+        ensure_under_directory("/kaggle/input/ace-edge-manifests/train.csv")
+        ensure_under_directory("/kaggle/working/ace-edge-runtime-manifests/train.csv")
+        with self.assertRaises(ValueError):
+            ensure_under_directory("/kaggle/working/untrusted/train.csv")
+
     def test_bk_tree_finds_only_radius_matches(self):
-        from ace_edge.data import _HammingBKTree
-        tree = _HammingBKTree(["0000000000000000", "ffffffffffffffff"])
+        from ace_edge.data import _HammingRadiusFourIndex
+        tree = _HammingRadiusFourIndex(["0000000000000000", "ffffffffffffffff"])
         self.assertTrue(tree.has_within("000000000000000f", 4))
         self.assertFalse(tree.has_within("000000000000001f", 4))
 

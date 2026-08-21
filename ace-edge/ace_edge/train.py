@@ -47,11 +47,11 @@ class Telemetry:
         return C()
 
 
-def benchmark_strategy(tf, strategy, batch_size, image_size, steps):
+def benchmark_strategy(tf, strategy, batch_size, image_size, warmup_steps, measured_steps):
     with strategy.scope():
         model = build_ace_edge(tf, image_size, backbone_weights=None)
         optimizer = tf.keras.optimizers.SGD()
-    dataset = tf.data.Dataset.range(batch_size * steps).batch(batch_size, drop_remainder=True)
+    dataset = tf.data.Dataset.range(batch_size * (warmup_steps + measured_steps)).batch(batch_size, drop_remainder=True)
     distributed = strategy.experimental_distribute_dataset(dataset)
     @tf.function
     def distributed_step(indices):
@@ -65,11 +65,26 @@ def benchmark_strategy(tf, strategy, batch_size, image_size, steps):
             optimizer.apply_gradients(zip(tape.gradient(loss, model.trainable_weights), model.trainable_weights))
             return loss
         return strategy.run(step, args=(indices,))
-    iterator=iter(distributed); warmup=next(iterator); distributed_step(warmup)
-    started = time.perf_counter()
-    measured=0
-    for batch in iterator: distributed_step(batch); measured += 1
-    return batch_size * measured / (time.perf_counter() - started)
+    iterator=iter(distributed)
+    for _ in range(warmup_steps):
+        tf.nest.map_structure(lambda value: value.numpy(), distributed_step(next(iterator)))
+    throughputs=[]
+    for _ in range(measured_steps):
+        started=time.perf_counter()
+        tf.nest.map_structure(lambda value: value.numpy(), distributed_step(next(iterator)))
+        throughputs.append(batch_size/(time.perf_counter()-started))
+    return throughputs
+
+
+def bootstrap_speedup_interval(one_steps, dual_steps, seed, draws=10000):
+    rng=np.random.default_rng(seed); one=np.asarray(one_steps); dual=np.asarray(dual_steps)
+    ratios=np.empty(draws,dtype=np.float64)
+    for index in range(draws):
+        one_median=np.median(rng.choice(one,size=len(one),replace=True))
+        dual_median=np.median(rng.choice(dual,size=len(dual),replace=True))
+        ratios[index]=dual_median/one_median
+    return {"median":float(np.median(dual)/np.median(one)),
+            "ci95_low":float(np.quantile(ratios,.025)),"ci95_high":float(np.quantile(ratios,.975))}
 
 
 def decode_sample_ids(raw_ids):
@@ -80,8 +95,8 @@ def distributed_predict(tf, strategy, model, dataset, expected_ids):
     @tf.function
     def step(batch):
         ids, images, targets = batch; out = model(images, training=False)
-        return ids, targets["class_probs"], out["class_probs"], out["reliability"]
-    columns = [[], [], [], []]
+        return ids, targets["class_probs"], out["class_probs"]
+    columns = [[], [], []]
     for batch in strategy.experimental_distribute_dataset(dataset):
         values = strategy.run(step, args=(batch,))
         for index, value in enumerate(values):
@@ -93,13 +108,66 @@ def distributed_predict(tf, strategy, model, dataset, expected_ids):
     return ids, *(np.concatenate(items) for items in columns[1:])
 
 
+def prediction_rows(ids, truth, probabilities):
+    probabilities = require_finite_class_probabilities(probabilities, "prediction")
+    labels = ("likely_real", "ai_generated", "face_manipulated")
+    rows = []
+    for sample_id, class_id, probs in zip(ids, truth, probabilities):
+        values = [float(value) for value in probs]
+        rows.append({
+            "sample_id": str(sample_id),
+            "class_id": int(class_id),
+            "predicted_class": labels[int(np.argmax(values))],
+            "p_likely_real": values[0],
+            "p_ai_generated": values[1],
+            "p_face_manipulated": values[2],
+            "probabilities": values,
+        })
+    return rows
+
+
+def require_finite_class_probabilities(probabilities, context):
+    """Reject invalid model output before calibration or report generation."""
+    values = np.asarray(probabilities, dtype=np.float64)
+    if values.ndim != 2 or values.shape[1] != 3:
+        raise RuntimeError(
+            f"{context} class probabilities must have shape (N, 3); found {values.shape}"
+        )
+    if not np.isfinite(values).all():
+        invalid = int(values.size - np.isfinite(values).sum())
+        raise RuntimeError(
+            f"{context} class probabilities contain {invalid} non-finite values; "
+            "refusing to calibrate or publish invalid metrics"
+        )
+    if ((values < 0.0) | (values > 1.0)).any():
+        raise RuntimeError(f"{context} class probabilities fall outside [0, 1]")
+    if not np.allclose(values.sum(axis=1), 1.0, rtol=1e-5, atol=1e-6):
+        raise RuntimeError(f"{context} class probabilities do not sum to one")
+    return values
+
+
+def validation_ai_threshold(truth, probabilities, target_real_recall):
+    """Choose an AI score threshold using validation reals only, never unseen data."""
+    if not 0.0 < target_real_recall < 1.0:
+        raise ValueError("target_real_recall must be strictly between zero and one")
+    values = require_finite_class_probabilities(probabilities, "validation")
+    real_scores = values[np.asarray(truth) == 0, 1]
+    if not len(real_scores):
+        raise RuntimeError("Validation set has no likely_real examples for threshold calibration")
+    # Prediction uses score >= threshold. Move one representable value above
+    # the selected real score so ties cannot silently violate the recall target.
+    selected = np.quantile(real_scores, target_real_recall, method="higher")
+    return float(np.nextafter(selected, np.inf))
+
+
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument("--config", required=True)
     config=json.loads(Path(parser.parse_args().config).read_text()); os.environ.setdefault("TF_DETERMINISTIC_OPS","1")
     import tensorflow as tf
     names=require_dual_t4(tf)
     if not is_chief(): raise RuntimeError("This MirroredStrategy entrypoint permits chief-only execution/writes")
-    if config["benchmark_steps"] < 2: raise ValueError("benchmark_steps must be at least 2 after warmup")
+    if config["benchmark_warmup_steps"] < 15 or config["benchmark_steps"] < 100 or config["benchmark_repetitions"] < 3:
+        raise ValueError("Benchmark requires >=15 warmup, >=100 measured steps, and >=3 repetitions")
     if config["global_batch_size"] % 2: raise ValueError("Global batch must divide across replicas")
     seed=config["seed"]; random.seed(seed); np.random.seed(seed); tf.keras.utils.set_random_seed(seed)
     tf.keras.mixed_precision.set_global_policy("mixed_float16")
@@ -114,45 +182,59 @@ def main():
                "unseen":verify_manifest_content(unseen,raw_hashes["unseen"])}
     if config["reliability_loss_weight"] != 0:
         raise RuntimeError("Baseline reliability loss must remain disabled until augmentation-consistency targets are computed online")
-    one=tf.distribute.OneDeviceStrategy("/GPU:0")
-    one_rate=benchmark_strategy(tf,one,config["global_batch_size"],config["image_size"],config["benchmark_steps"])
-    del one; tf.keras.backend.clear_session()
+    out=Path(config["output_dir"]); out.mkdir(parents=True,exist_ok=True)
+    benchmark_path=Path(config["benchmark_report"])
+    benchmark=json.loads(benchmark_path.read_text())
+    if benchmark.get("trial_scope") != "fresh_process" or not benchmark.get("counterbalanced"):
+        raise RuntimeError("Training requires a fresh-process counterbalanced benchmark report")
+    if benchmark["ci95_low"] < config["minimum_dual_gpu_speedup"]:
+        raise RuntimeError(f"Dual T4 speedup CI lower bound {benchmark['ci95_low']:.2f} below gate")
+    (out/"benchmark.json").write_text(json.dumps(benchmark,indent=2))
     dual=tf.distribute.MirroredStrategy()
-    dual_rate=benchmark_strategy(tf,dual,config["global_batch_size"],config["image_size"],config["benchmark_steps"])
-    speedup=dual_rate/one_rate
-    if speedup < config["minimum_dual_gpu_speedup"]: raise RuntimeError(f"Dual T4 speedup {speedup:.2f} below gate")
+    if dual.num_replicas_in_sync != 2:
+        raise RuntimeError(f"Training expected 2 replicas, found {dual.num_replicas_in_sync}")
+    include_binary_head = config.get("include_binary_head", False)
     with dual.scope():
-        model=build_ace_edge(tf,config["image_size"],config["dropout"],config["backbone_weights"])
+        model=build_ace_edge(tf,config["image_size"],config["dropout"],config["backbone_weights"],
+                             training_augmentation=config.get("training_augmentation", False),
+                             include_binary_head=include_binary_head)
         size=enforce_size_limit(model,config["max_fp32_mib"])
         lr=config["learning_rate"]*config["global_batch_size"]/config["reference_batch_size"]
-        model.compile(optimizer=tf.keras.optimizers.AdamW(lr,weight_decay=config["weight_decay"]),
-          loss={"class_probs":tf.keras.losses.CategoricalCrossentropy(label_smoothing=config["label_smoothing"]),
-                "locality":"binary_crossentropy","reliability":"binary_crossentropy"},
-          loss_weights={"class_probs":1.,"locality":config["locality_loss_weight"],"reliability":config["reliability_loss_weight"]})
-    out=Path(config["output_dir"]); out.mkdir(parents=True,exist_ok=True)
-    train_ds=build_dataset(tf,train,config["image_size"],config["global_batch_size"],True,seed)
-    val_ds=build_dataset(tf,val,config["image_size"],config["global_batch_size"],False,seed)
+        losses={"class_probs":tf.keras.losses.CategoricalCrossentropy(label_smoothing=config["label_smoothing"])}
+        if include_binary_head:
+            losses["binary_prob"]=tf.keras.losses.BinaryCrossentropy()
+        model.compile(optimizer=tf.keras.optimizers.AdamW(lr,weight_decay=config["weight_decay"]),loss=losses)
+    train_ds=build_dataset(tf,train,config["image_size"],config["global_batch_size"],True,seed,
+                           training_augmentation=config.get("training_augmentation",False),
+                           include_binary_target=include_binary_head)
+    val_ds=build_dataset(tf,val,config["image_size"],config["global_batch_size"],False,seed,
+                         include_binary_target=include_binary_head)
     telemetry=Telemetry(tf,out/"telemetry.json",config["steps_per_epoch"]*config["global_batch_size"])
     best=out/"best.weights.h5"
-    model.fit(train_ds,validation_data=val_ds,steps_per_epoch=config["steps_per_epoch"],epochs=config["epochs"],
-      callbacks=[tf.keras.callbacks.ModelCheckpoint(best,monitor="val_loss",mode="min",save_best_only=True,save_weights_only=True),telemetry.callback()])
+    history = model.fit(train_ds,validation_data=val_ds,steps_per_epoch=config["steps_per_epoch"],epochs=config["epochs"],
+      callbacks=[tf.keras.callbacks.TerminateOnNaN(),
+                 tf.keras.callbacks.ModelCheckpoint(best,monitor="val_loss",mode="min",save_best_only=True,save_weights_only=True),
+                 telemetry.callback()])
+    if not history.history.get("val_loss") or not np.isfinite(history.history["val_loss"]).any():
+        raise RuntimeError("Training produced no finite validation loss; refusing to evaluate or export")
     model.load_weights(best)
     pred_ds=build_dataset(tf,val,config["image_size"],config["global_batch_size"],False,seed,include_ids=True)
-    ids,ys,probs,rel=distributed_predict(tf,dual,model,pred_ds,val["sample_id"].astype(str)); truth=ys.argmax(1)
-    rows=[]
-    for sid,y,p,r in zip(ids,truth,probs,rel): rows.append({"sample_id":sid,"class_id":int(y),"probabilities":p.tolist(),"reliability":float(r[0])})
+    ids,ys,probs=distributed_predict(tf,dual,model,pred_ds,val["sample_id"].astype(str)); truth=ys.argmax(1)
+    rows=prediction_rows(ids,truth,probs)
     (out/"validation_predictions.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
+    target_real_recall=float(config.get("target_validation_real_recall", .95))
+    ai_threshold=validation_ai_threshold(truth,probs,target_real_recall)
     unseen_ds=build_dataset(tf,unseen,config["image_size"],config["global_batch_size"],False,seed,include_ids=True)
-    uids,uys,uprobs,urel=distributed_predict(tf,dual,model,unseen_ds,unseen["sample_id"].astype(str)); utruth=uys.argmax(1)
-    unseen_rows=[{"sample_id":sid,"class_id":int(y),"probabilities":p.tolist()}
-                 for sid,y,p in zip(uids,utruth,uprobs)]
+    uids,uys,uprobs=distributed_predict(tf,dual,model,unseen_ds,unseen["sample_id"].astype(str)); utruth=uys.argmax(1)
+    unseen_rows=prediction_rows(uids,utruth,uprobs)
     (out/"unseen_generator_predictions.jsonl").write_text("\n".join(json.dumps(row) for row in unseen_rows))
-    unseen_metrics=unseen_generator_metrics(utruth,uprobs,unseen.set_index("sample_id").loc[uids,"generator_or_method"].to_numpy())
+    unseen_metrics=unseen_generator_metrics(utruth,uprobs,unseen.set_index("sample_id").loc[uids,"generator_or_method"].to_numpy(),ai_threshold)
     report={"raw_manifest_sha256":raw_hashes,"integrity":integrity,
-      "devices":names,"benchmark":{"one_examples_s":one_rate,"dual_examples_s":dual_rate,"speedup":speedup},
+      "devices":names,"benchmark":benchmark,
       "replica_collision_audit":{"expected":len(val),"gathered":len(ids),"unique":len(set(ids))},
       "parameters":size.parameters,"fp32_mib":size.fp32_mib,"dangerous_false_real_rate":dangerous_false_real_rate(truth,probs),
       "brier":multiclass_brier(truth,probs),"abstention_release_ready":False,
+      "operating_point":{"ai_threshold":ai_threshold,"target_validation_real_recall":target_real_recall},
       "unseen_generator":{**unseen_metrics,"dangerous_false_real_rate":dangerous_false_real_rate(utruth,uprobs),"brier":multiclass_brier(utruth,uprobs)}}
     (out/"validation_metrics.json").write_text(json.dumps(report,indent=2)); model.export(out/"saved_model")
     if directory_bytes(out)>config["max_output_gib"]*1024**3: raise RuntimeError("Output exceeds storage contract")

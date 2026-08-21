@@ -4,6 +4,7 @@ ace-frontend-backup/
 backup_ace_backend/
 *.whl
 __pycache__/
+.pytest_cache/
 node_modules/
 .env
 .DS_Store
@@ -15,3 +16,5 @@ ace-edge/**/*.h5
 ace-edge/**/*.tflite
 ace-edge/**/*predictions*.csv
 ace-edge/**/*integrity*.json
+ace-edge/**/*benchmark*.json
+ace-edge/**/trial-*.json

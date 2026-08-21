@@ -65,6 +65,38 @@ class _HammingBKTree:
         return False
 
 
+class _HammingRadiusFourIndex:
+    """Exact radius-4 index using five disjoint bit chunks.
+
+    Two 64-bit values at Hamming distance <=4 must share at least one of five
+    chunks, so candidate generation is lossless and much faster on dense sets.
+    """
+
+    _WIDTHS = (13, 13, 13, 13, 12)
+
+    def __init__(self, values):
+        from collections import defaultdict
+        remaining = 64
+        self.chunks = []
+        for width in self._WIDTHS:
+            remaining -= width
+            self.chunks.append((remaining, (1 << width) - 1))
+        self.values = [int(value, 16) for value in dict.fromkeys(values)]
+        self.indices = [defaultdict(list) for _ in self.chunks]
+        for index, value in enumerate(self.values):
+            for chunk_index, (shift, mask) in enumerate(self.chunks):
+                self.indices[chunk_index][(value >> shift) & mask].append(index)
+
+    def has_within(self, value, radius=4):
+        if radius != 4:
+            raise ValueError("This exact index is specialized for radius 4")
+        integer = int(value, 16)
+        candidates = set()
+        for index, (shift, mask) in enumerate(self.chunks):
+            candidates.update(self.indices[index].get((integer >> shift) & mask, ()))
+        return any((integer ^ self.values[index]).bit_count() <= radius for index in candidates)
+
+
 def file_sha256(path: str) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as stream:
@@ -161,7 +193,7 @@ def assert_independent(train: pd.DataFrame, validation: pd.DataFrame) -> None:
             f"found {sorted(versions)}. ahash64-v1 is diagnostic-only."
         )
     right_hashes = list(validation["phash"]) + list(validation["local_phash"])
-    right_tree = _HammingBKTree(right_hashes)
+    right_tree = _HammingRadiusFourIndex(right_hashes)
     for left_hash in dict.fromkeys(list(train["phash"]) + list(train["local_phash"])):
         if right_tree.has_within(left_hash, 4):
             raise ValueError("Perceptual content leakage within Hamming distance <=4")
@@ -188,7 +220,9 @@ def raw_manifest_digest(path: str) -> str:
 
 
 def build_dataset(tf, frame: pd.DataFrame, image_size: int, global_batch_size: int,
-                  training: bool, seed: int, num_parallel_calls=-1, cache=False, include_ids=False):
+                  training: bool, seed: int, num_parallel_calls=-1, cache=False, include_ids=False,
+                  baseline_only=True, training_augmentation: bool = False,
+                  include_binary_target: bool = False):
     paths = frame["path"].astype(str).to_numpy()
     local_paths = frame["local_path"].astype(str).to_numpy()
     local_valid = frame["local_valid"].astype("float32").to_numpy()
@@ -213,15 +247,26 @@ def build_dataset(tf, frame: pd.DataFrame, image_size: int, global_batch_size: i
     def decode_one(path):
         image = tf.io.decode_image(tf.io.read_file(path), channels=3, expand_animations=False)
         image.set_shape([None, None, 3])
+        if training and training_augmentation:
+            # Conservative, isolated augmentations:
+            image = tf.image.random_flip_left_right(image, seed=seed)
+            image = tf.image.random_brightness(image, max_delta=12, seed=seed)
+            image = tf.image.random_contrast(image, lower=0.95, upper=1.05, seed=seed)
+            image = tf.image.random_jpeg_quality(image, min_jpeg_quality=80, max_jpeg_quality=100, seed=seed)
         image = tf.image.resize(image, [image_size, image_size], antialias=True)
+        image = tf.clip_by_value(image, 0.0, 255.0)
         return tf.cast(image, tf.float32) / 127.5 - 1.0
 
     def decode(sample_id, path, local_path, local_valid, label, local, reliable):
-        targets = {
-            "class_probs": tf.one_hot(label, 3, dtype=tf.float32),
-            "locality": tf.reshape(tf.cast(local, tf.float32), [1]),
-            "reliability": tf.reshape(tf.cast(reliable, tf.float32), [1]),
-        }
+        targets = {"class_probs": tf.one_hot(label, 3, dtype=tf.float32)}
+        if include_binary_target:
+            is_synthetic = tf.cast(label > 0, tf.float32)
+            targets["binary_prob"] = tf.reshape(is_synthetic, [1])
+        if not baseline_only:
+            targets.update({
+                "locality": tf.reshape(tf.cast(local, tf.float32), [1]),
+                "reliability": tf.reshape(tf.cast(reliability, tf.float32), [1]),
+            })
         inputs = {"global_image": decode_one(path), "local_image": decode_one(local_path),
                   "local_valid": tf.reshape(local_valid, [1])}
         return (sample_id, inputs, targets) if include_ids else (inputs, targets)

@@ -32,7 +32,11 @@ def enforce_size_limit(model, max_fp32_mib: float = 50.0, learned_artifacts=()) 
 
 def ensure_under_directory(path: str, root: str = "/kaggle/input") -> None:
     candidate = Path(path)
-    try:
-        candidate.relative_to(Path(root))
-    except ValueError as exc:
-        raise ValueError(f"Input {path!r} must remain under mounted {root}") from exc
+    allowed = (Path(root), Path("/kaggle/working/ace-edge-runtime-manifests"))
+    for directory in allowed:
+        try:
+            candidate.relative_to(directory)
+            return
+        except ValueError:
+            pass
+    raise ValueError(f"Input {path!r} must remain under an approved manifest root")

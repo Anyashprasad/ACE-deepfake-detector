@@ -19,7 +19,11 @@
   "cache_dataset": false,
   "num_parallel_calls": -1,
   "steps_per_epoch": 20,
-  "benchmark_steps": 5,
+  "benchmark_warmup_steps": 20,
+  "benchmark_steps": 100,
+  "benchmark_repetitions": 10,
+  "benchmark_repetition_scope": "fresh_process",
+  "benchmark_bootstrap_draws": 10000,
   "minimum_dual_gpu_speedup": 1.35,
   "max_output_gib": 2.0
 }

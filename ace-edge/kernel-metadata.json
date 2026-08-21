@@ -6,6 +6,7 @@
   "kernel_type": "script",
   "is_private": true,
   "enable_gpu": true,
-  "enable_internet": false,
-  "dataset_sources": ["anyashprasad/ace-edge-training-source", "anyashprasad/ace-edge-ffpp-compact", "yangsangtai/tiny-genimage", "cartografia/unbiased-tiny-genimage", "xhlulu/140k-real-and-fake-faces"]
+  "machine_shape": "GPU_T4_X2",
+  "enable_internet": true,
+  "dataset_sources": ["anyashprasad/ace-edge-training-source", "anyashprasad/ace-edge-manifests", "anyashprasad/ace-edge-ffpp-compact", "yangsangtai/tiny-genimage", "cartografia/unbiased-tiny-genimage", "xhlulu/140k-real-and-fake-faces"]
 }

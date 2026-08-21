@@ -98,13 +98,25 @@ def main():
         rows.append(row(image, class_name, "tiny_genimage", split, "", generator))
 
     faces = dataset_root("140k-real-and-fake-faces")
-    for image in faces.rglob("*"):
+    faces_real, faces_fake = [], []
+    for image in sorted(faces.rglob("*")):
         relative = image.relative_to(faces).as_posix().lower()
         if image.suffix.lower() not in IMG or "/train/" not in f"/{relative}/":
             continue
         class_name = "ai_generated" if "/fake/" in f"/{relative}/" else "likely_real"
-        rows.append(row(image, class_name, "140k_faces", "train", "",
-                        "stylegan" if class_name == "ai_generated" else "real"))
+        target = faces_fake if class_name == "ai_generated" else faces_real
+        target.append(row(image, class_name, "140k_faces", "train", "",
+                          "stylegan" if class_name == "ai_generated" else "real"))
+    # Downsample faces to prevent facial feature bias from dominating general imagery
+    max_faces_per_class = 10000
+    if len(faces_real) > max_faces_per_class:
+        stride = len(faces_real) / max_faces_per_class
+        faces_real = [faces_real[int(i * stride)] for i in range(max_faces_per_class)]
+    if len(faces_fake) > max_faces_per_class:
+        stride = len(faces_fake) / max_faces_per_class
+        faces_fake = [faces_fake[int(i * stride)] for i in range(max_faces_per_class)]
+    rows.extend(faces_real)
+    rows.extend(faces_fake)
 
     hash_counts = Counter(item["sha256"] for item in rows)
     duplicate_hashes = {digest for digest, count in hash_counts.items() if count > 1}
