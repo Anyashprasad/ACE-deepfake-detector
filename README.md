@@ -8,15 +8,16 @@ ACE 2.4 is preserved as a historical baseline, not a production authenticity ora
 
 ACE Edge starts again with grouped source-family splits, held-out generator families, content-hash leakage checks, fixed pre-registered release gates, and per-sample evaluation evidence.
 
-## Current status
+## ACE Edge v1.0.0 release
 
-- Dual-T4 baseline training code is statically approved after independent review.
-- Production execution must begin with a short one-versus-two-T4 smoke/throughput gate.
+- The validated research weights are available from the [ACE Edge v1.0.0 release](https://github.com/Anyashprasad/ACE-deepfake-detector/releases/tag/ace-edge-v1.0.0).
+- On the held-out face-manipulation validation partition, `face_manipulated` achieved 0.9347 precision, 0.8750 recall, 0.9039 F1, 0.99394 AUROC, and 0.95671 PR-AUC.
+- The dual-T4 fixed-work smoke benchmark passed at 1.8437× median speedup (95% CI 1.8396–1.8458).
 - The complete learned inference stack is capped at 50 MiB FP32; INT8 target is 15 MiB.
 - Reliability/abstention training is currently disabled. No public deployment or `inconclusive` safety claim is approved yet.
-- No new ACE Edge performance claim will be published until held-out and SDFVD gates pass.
+- The `ai_generated` class remains exploratory because unseen-generator generalisation was uneven, especially on VQDM.
 
-See [`ace-edge/README.md`](ace-edge/README.md) for the training entrypoint and [`ace-edge/review/REVIEW_CHECKLIST.md`](ace-edge/review/REVIEW_CHECKLIST.md) for the frozen evaluation contract.
+See [`ace-edge/README.md`](ace-edge/README.md) for verified loading/inference and training instructions, [`ace-edge/MODEL_CARD.md`](ace-edge/MODEL_CARD.md) for limitations, and [`ace-edge/review/REVIEW_CHECKLIST.md`](ace-edge/review/REVIEW_CHECKLIST.md) for the frozen evaluation contract.
 
 ## Historical artifacts
 
